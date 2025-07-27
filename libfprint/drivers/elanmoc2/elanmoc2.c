@@ -66,7 +66,7 @@ elanmoc2_cmd_usb_callback (FpiUsbTransfer *transfer,
                            GError         *error)
 {
   FpiDeviceElanMoC2 *self = FPI_DEVICE_ELANMOC2 (device);
-  gboolean short_is_error = (gboolean) (uintptr_t) user_data;
+  const gboolean short_is_error = GPOINTER_TO_INT (user_data);
 
   if (self->ssm == NULL)
     {
@@ -109,12 +109,10 @@ elanmoc2_cmd_usb_callback (FpiUsbTransfer *transfer,
       fpi_usb_transfer_fill_bulk (transfer_in, cmd->ep_in,
                                   cmd->in_len);
 
-      g_autoptr(GCancellable) cancellable =
-        cmd->cancellable ? fpi_device_get_cancellable (device) : NULL;
-
       fpi_usb_transfer_submit (transfer_in,
                                ELANMOC2_USB_RECV_TIMEOUT,
-                               g_steal_pointer (&cancellable),
+                               cmd->is_cancellable ?
+                               fpi_device_get_cancellable (device) : NULL,
                                elanmoc2_cmd_usb_callback,
                                NULL);
     }
@@ -160,14 +158,12 @@ elanmoc2_cmd_transceive_full (FpDevice          *device,
                                    cmd->out_len,
                                    g_free);
 
-  g_autoptr(GCancellable) cancellable =
-    cmd->cancellable ? fpi_device_get_cancellable (device) : NULL;
-
   fpi_usb_transfer_submit (g_steal_pointer (&transfer_out),
                            ELANMOC2_USB_SEND_TIMEOUT,
-                           g_steal_pointer (&cancellable),
+                           cmd->is_cancellable ?
+                           fpi_device_get_cancellable (device) : NULL,
                            elanmoc2_cmd_usb_callback,
-                           (gpointer) (uintptr_t) short_is_error);
+                           GINT_TO_POINTER (short_is_error));
 }
 
 static void
@@ -210,31 +206,6 @@ elanmoc2_print_set_data (FpPrint      *print,
                                                    sizeof (guchar));
   GVariant *fpi_data = g_variant_new ("(y@ay)", finger_id, user_id_v);
   g_object_set (print, "fpi-data", fpi_data, NULL);
-}
-
-static GBytes *
-elanmoc2_print_get_data (FpPrint *print,
-                         guchar  *finger_id)
-{
-  g_autoptr(GVariant) fpi_data = NULL;
-  g_autoptr(GVariant) user_id_v = NULL;
-
-  g_object_get (print, "fpi-data", &fpi_data, NULL);
-  g_assert_nonnull (fpi_data);
-
-  g_variant_get (fpi_data, "(y@ay)", finger_id, &user_id_v);
-  g_assert_nonnull (user_id_v);
-
-  gsize user_id_len_s = 0;
-  gconstpointer user_id_tmp = g_variant_get_fixed_array (user_id_v,
-                                                         &user_id_len_s,
-                                                         sizeof (guchar));
-  g_assert (user_id_len_s <= 255);
-
-  g_autoptr(GByteArray) user_id = g_byte_array_new ();
-  g_byte_array_append (user_id, user_id_tmp, user_id_len_s);
-
-  return g_byte_array_free_to_bytes (g_steal_pointer (&user_id));
 }
 
 static FpPrint *
@@ -318,26 +289,6 @@ elanmoc2_print_new_from_finger_info (FpiDeviceElanMoC2 *self,
 
   return g_steal_pointer (&print);
 }
-
-static gboolean
-elanmoc2_finger_info_is_present (FpiDeviceElanMoC2 *self,
-                                 GBytes            *finger_info_response)
-{
-  int offset = self->dev_type == ELANMOC2_DEV_0C5E ? 3 : 2;
-
-  g_assert (g_bytes_get_size (finger_info_response) >= offset + 2);
-
-
-  /* If the user ID starts with "FP", report true. This is a heuristic: after
-   * wiping the sensor, the user IDs are not reset. */
-  const gchar *data = g_bytes_get_data (finger_info_response, NULL);
-  const gchar *user_id = &data[offset];
-
-  /* I'm intentionally not using `g_str_has_prefix` here because it uses
-   * `strlen` and this is binary data. */
-  return memcmp (user_id, "FP", 2) == 0;
-}
-
 
 static void
 elanmoc2_cancel (FpDevice *device)
@@ -549,7 +500,7 @@ elanmoc2_identify_verify_report (FpDevice *device, FpPrint *print,
             }
           fp_info ("Identify: no match");
         }
-      fpi_device_identify_report (device, NULL, NULL, *error);
+      fpi_device_identify_report (device, NULL, print, *error);
       return TRUE;
     }
   else
@@ -722,143 +673,6 @@ elanmoc2_identify_verify (FpDevice *device)
                            IDENTIFY_NUM_STATES);
   self->enrolled_num_retries = 0;
   fpi_ssm_start (self->ssm, elanmoc2_ssm_completed_callback);
-}
-
-static void
-elanmoc2_list_ssm_completed_callback (FpiSsm *ssm, FpDevice *device,
-                                      GError *error)
-{
-  FpiDeviceElanMoC2 *self = FPI_DEVICE_ELANMOC2 (device);
-
-  g_clear_pointer (&self->list_result, g_ptr_array_unref);
-  elanmoc2_ssm_completed_callback (ssm, device, error);
-}
-
-static void
-elanmoc2_list_run_state (FpiSsm *ssm, FpDevice *device)
-{
-  FpiDeviceElanMoC2 *self = FPI_DEVICE_ELANMOC2 (device);
-
-  g_autoptr(GBytes) buffer_in = g_steal_pointer (&self->buffer_in);
-
-  const guint8 *data_in =
-    buffer_in != NULL ? g_bytes_get_data (buffer_in, NULL) : NULL;
-  const gsize data_in_len =
-    buffer_in != NULL ? g_bytes_get_size (buffer_in) : 0;
-
-  switch (fpi_ssm_get_cur_state (ssm))
-    {
-    case LIST_GET_NUM_ENROLLED:
-      elanmoc2_perform_get_num_enrolled (self, ssm);
-      break;
-
-    case LIST_CHECK_NUM_ENROLLED: {
-        if (data_in_len == 0)
-          {
-            g_autoptr(GError) error =
-              elanmoc2_get_num_enrolled_retry_or_error (self,
-                                                        ssm,
-                                                        LIST_GET_NUM_ENROLLED);
-            if (error != NULL)
-              {
-                fpi_device_list_complete (device,
-                                          NULL,
-                                          g_steal_pointer (&error));
-                fpi_ssm_mark_completed (g_steal_pointer (&self->ssm));
-              }
-            break;
-          }
-
-        g_assert_nonnull (data_in);
-        g_assert (data_in_len >= 2);
-
-        self->enrolled_num = data_in[1];
-
-        fp_info ("List: fingers enrolled: %d", self->enrolled_num);
-        if (self->enrolled_num == 0)
-          {
-            fpi_device_list_complete (device,
-                                      g_steal_pointer (&self->list_result),
-                                      NULL);
-            fpi_ssm_mark_completed (g_steal_pointer (&self->ssm));
-            break;
-          }
-        self->print_index = 0;
-        fpi_ssm_next_state (ssm);
-        break;
-      }
-
-    case LIST_GET_FINGER_INFO: {
-        g_autoptr(GByteArray) buffer_out =
-          elanmoc2_prepare_cmd (self, &cmd_finger_info);
-
-        if (buffer_out == NULL)
-          {
-            fpi_ssm_next_state (ssm);
-            break;
-          }
-        g_assert (buffer_out->len >= 4);
-        buffer_out->data[3] = self->print_index;
-        elanmoc2_cmd_transceive_full (device,
-                                      &cmd_finger_info,
-                                      buffer_out,
-                                      FALSE);
-        fp_info ("Sent get finger info command for finger %d",
-                 self->print_index);
-        break;
-      }
-
-    case LIST_CHECK_FINGER_INFO:
-      fpi_device_report_finger_status (device, FP_FINGER_STATUS_NONE);
-
-      if (data_in_len < cmd_finger_info.in_len)
-        {
-          GError *error = fpi_device_error_new_msg (FP_DEVICE_ERROR_GENERAL,
-                                                    "Reader refuses operation "
-                                                    "before valid finger match");
-          fpi_device_list_complete (device, NULL, error);
-          fpi_ssm_mark_completed (g_steal_pointer (&self->ssm));
-          break;
-        }
-
-      fp_info ("Successfully retrieved finger info for %d",
-               self->print_index);
-      g_assert_nonnull (buffer_in);
-      if (elanmoc2_finger_info_is_present (self, buffer_in))
-        {
-          FpPrint *print = elanmoc2_print_new_from_finger_info (self,
-                                                                self->print_index,
-                                                                buffer_in);
-          g_ptr_array_add (self->list_result, g_object_ref_sink (print));
-        }
-
-      self->print_index++;
-
-      if (self->print_index < MIN (ELANMOC2_MAX_PRINTS, self->enrolled_num))
-        {
-          fpi_ssm_jump_to_state (ssm, LIST_GET_FINGER_INFO);
-        }
-      else
-        {
-          fpi_device_list_complete (device,
-                                    g_steal_pointer (&self->list_result),
-                                    NULL);
-          fpi_ssm_mark_completed (g_steal_pointer (&self->ssm));
-        }
-      break;
-    }
-}
-
-static void
-elanmoc2_list (FpDevice *device)
-{
-  FpiDeviceElanMoC2 *self = FPI_DEVICE_ELANMOC2 (device);
-
-  fp_info ("[elanmoc2] New list operation");
-  self->ssm = fpi_ssm_new (device, elanmoc2_list_run_state, LIST_NUM_STATES);
-  self->list_result = g_ptr_array_new_with_free_func (g_object_unref);
-  self->enrolled_num_retries = 0;
-  fpi_ssm_start (self->ssm, elanmoc2_list_ssm_completed_callback);
 }
 
 static void
@@ -1254,114 +1068,6 @@ elanmoc2_enroll (FpDevice *device)
 }
 
 static void
-elanmoc2_delete_run_state (FpiSsm *ssm, FpDevice *device)
-{
-  FpiDeviceElanMoC2 *self = FPI_DEVICE_ELANMOC2 (device);
-
-  g_autoptr(GError) error = NULL;
-  g_autoptr(GBytes) buffer_in = g_steal_pointer (&self->buffer_in);
-
-  const guint8 *data_in =
-    buffer_in != NULL ? g_bytes_get_data (buffer_in, NULL) : NULL;
-  const gsize data_in_len =
-    buffer_in != NULL ? g_bytes_get_size (buffer_in) : 0;
-
-  switch (fpi_ssm_get_cur_state (ssm))
-    {
-    case DELETE_GET_NUM_ENROLLED:
-      elanmoc2_perform_get_num_enrolled (self, ssm);
-      break;
-
-    case DELETE_DELETE: {
-        if (data_in_len == 0)
-          {
-            error =
-              elanmoc2_get_num_enrolled_retry_or_error (self,
-                                                        ssm,
-                                                        DELETE_GET_NUM_ENROLLED);
-            if (error != NULL)
-              {
-                fpi_device_delete_complete (device, g_steal_pointer (&error));
-                fpi_ssm_mark_completed (g_steal_pointer (&self->ssm));
-              }
-            break;
-          }
-
-        g_assert_nonnull (data_in);
-        g_assert (data_in_len >= 2);
-
-        self->enrolled_num = data_in[1];
-        if (self->enrolled_num == 0)
-          {
-            fp_info ("No fingers enrolled, nothing to delete");
-            fpi_device_delete_complete (device, NULL);
-            fpi_ssm_mark_completed (g_steal_pointer (&self->ssm));
-            break;
-          }
-        FpPrint *print = NULL;
-        fpi_device_get_delete_data (device, &print);
-
-        guint8 finger_id = 0xFF;
-
-        g_autoptr(GBytes) user_id =
-          elanmoc2_print_get_data (print, &finger_id);
-        gsize user_id_bytes = MIN (cmd_delete.out_len - 4,
-                                   ELANMOC2_USER_ID_MAX_LEN);
-        user_id_bytes = MIN (user_id_bytes, g_bytes_get_size (user_id));
-
-        g_autoptr(GByteArray) buffer_out = elanmoc2_prepare_cmd (self,
-                                                                 &cmd_delete);
-        if (buffer_out == NULL)
-          {
-            fpi_ssm_next_state (ssm);
-            break;
-          }
-
-        g_assert (buffer_out->len >= 4 + user_id_bytes);
-        buffer_out->data[3] = 0xf0 | (finger_id + 5);
-        memcpy (&buffer_out->data[4],
-                g_bytes_get_data (user_id, NULL),
-                user_id_bytes);
-        elanmoc2_cmd_transceive (device, &cmd_delete, buffer_out);
-        break;
-      }
-
-    case DELETE_CHECK_DELETED: {
-        error = NULL;
-
-        g_assert_nonnull (data_in);
-        g_assert (data_in_len >= 2);
-
-        /* If the finger is still enrolled, we don't want to fail the operation,
-         * but we also don't want to report success. We'll just report that the
-         * finger is no longer enrolled. */
-        if (data_in[1] != 0 &&
-            data_in[1] != ELANMOC2_RESP_NOT_ENROLLED)
-          fp_info (
-            "Delete failed with error code %d, assuming no longer enrolled",
-            data_in[1]);
-
-        fpi_ssm_mark_completed (g_steal_pointer (&self->ssm));
-        fpi_device_delete_complete (device, g_steal_pointer (&error));
-
-        break;
-      }
-    }
-}
-
-static void
-elanmoc2_delete (FpDevice *device)
-{
-  FpiDeviceElanMoC2 *self = FPI_DEVICE_ELANMOC2 (device);
-
-  fp_info ("[elanmoc2] New delete operation");
-  self->ssm = fpi_ssm_new (device, elanmoc2_delete_run_state,
-                           DELETE_NUM_STATES);
-  self->enrolled_num_retries = 0;
-  fpi_ssm_start (self->ssm, elanmoc2_ssm_completed_callback);
-}
-
-static void
 elanmoc2_clear_storage_run_state (FpiSsm *ssm, FpDevice *device)
 {
   FpiDeviceElanMoC2 *self = FPI_DEVICE_ELANMOC2 (device);
@@ -1448,7 +1154,6 @@ elanmoc2_clear_storage (FpDevice *device)
 static void
 fpi_device_elanmoc2_init (FpiDeviceElanMoC2 *self)
 {
-  G_DEBUG_HERE ();
 }
 
 static const FpIdEntry elanmoc2_id_table[] = {
@@ -1478,9 +1183,7 @@ fpi_device_elanmoc2_class_init (FpiDeviceElanMoC2Class *klass)
   dev_class->identify = elanmoc2_identify_verify;
   dev_class->verify = elanmoc2_identify_verify;
   dev_class->enroll = elanmoc2_enroll;
-  dev_class->delete = elanmoc2_delete;
   dev_class->clear_storage = elanmoc2_clear_storage;
-  dev_class->list = elanmoc2_list;
   dev_class->cancel = elanmoc2_cancel;
 
   fpi_device_class_auto_initialize_features (dev_class);

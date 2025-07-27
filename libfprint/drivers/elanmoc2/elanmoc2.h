@@ -77,7 +77,7 @@ typedef struct elanmoc2_cmd
   int            in_len;
   int            ep_in;
   unsigned short devices;
-  gboolean       cancellable;
+  gboolean       is_cancellable;
   gboolean       ssm_not_required;
 } Elanmoc2Cmd;
 
@@ -89,7 +89,7 @@ static const Elanmoc2Cmd cmd_identify = {
   .out_len = 3,
   .in_len = 2,
   .ep_in = ELANMOC2_EP_MOC_CMD_IN,
-  .cancellable = TRUE,
+  .is_cancellable = TRUE,
 };
 
 static const Elanmoc2Cmd cmd_enroll = {
@@ -97,7 +97,7 @@ static const Elanmoc2Cmd cmd_enroll = {
   .out_len = 7,
   .in_len = 2,
   .ep_in = ELANMOC2_EP_MOC_CMD_IN,
-  .cancellable = TRUE,
+  .is_cancellable = TRUE,
 };
 
 
@@ -171,14 +171,6 @@ enum IdentifyStates {
   IDENTIFY_NUM_STATES
 };
 
-enum ListStates {
-  LIST_GET_NUM_ENROLLED,
-  LIST_CHECK_NUM_ENROLLED,
-  LIST_GET_FINGER_INFO,
-  LIST_CHECK_FINGER_INFO,
-  LIST_NUM_STATES
-};
-
 enum EnrollStates {
   ENROLL_GET_NUM_ENROLLED,
   ENROLL_CHECK_NUM_ENROLLED,
@@ -193,13 +185,6 @@ enum EnrollStates {
   ENROLL_COMMIT,
   ENROLL_CHECK_COMMITTED,
   ENROLL_NUM_STATES
-};
-
-enum DeleteStates {
-  DELETE_GET_NUM_ENROLLED,
-  DELETE_DELETE,
-  DELETE_CHECK_DELETED,
-  DELETE_NUM_STATES
 };
 
 enum ClearStorageStates {
