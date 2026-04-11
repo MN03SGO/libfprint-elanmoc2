@@ -1,0 +1,6 @@
+Using device /net/reactivated/Fprint/Device/0
+Listing enrolled fingers:
+ - #0: right-index-finger
+Verify started!
+Verifying: right-index-finger
+Verify result: verify-unknown-error (done)

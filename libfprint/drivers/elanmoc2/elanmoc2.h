@@ -121,7 +121,7 @@ static const Elanmoc2Cmd cmd_finger_info = {
 static const Elanmoc2Cmd cmd_get_enrolled_count = {
   .cmd = {0xff, 0x04},
   .out_len = 3,
-  .in_len = 2,
+  .in_len = 64,
   .ep_in = ELANMOC2_EP_CMD_IN,
 };
 
@@ -157,7 +157,7 @@ static const Elanmoc2Cmd cmd_delete = {
 static const Elanmoc2Cmd cmd_wipe_sensor = {
   .cmd = {0xff, 0x99},
   .out_len = 3,
-  .in_len = 0,
+  .in_len = 64,
   .ep_in = ELANMOC2_EP_CMD_IN,
 };
 
