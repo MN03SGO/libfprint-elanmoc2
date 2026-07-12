@@ -43,6 +43,8 @@ struct _FpiDeviceElanMoC2
   /* USB response data */
   GBytes *buffer_in;
   const Elanmoc2Cmd *in_flight_cmd;
+  gboolean awaiting_read;
+  unsigned int short_read_retries;
 
   /* Command status data */
   FpiSsm *ssm;
@@ -90,17 +92,21 @@ elanmoc2_cmd_usb_callback(FpiUsbTransfer *transfer,
     return;
   }
 
-  if (self->in_flight_cmd != NULL)
+  if (self->in_flight_cmd != NULL && !self->awaiting_read)
   {
     /* Send callback */
-    const Elanmoc2Cmd *cmd = g_steal_pointer(&self->in_flight_cmd);
+    const Elanmoc2Cmd *cmd = self->in_flight_cmd;
 
     if (cmd->in_len == 0)
     {
+      self->in_flight_cmd = NULL;
       /* Nothing to receive */
       fpi_ssm_next_state(self->ssm);
       return;
     }
+
+    self->awaiting_read = TRUE;
+    self->short_read_retries = 0;
 
     FpiUsbTransfer *transfer_in = fpi_usb_transfer_new(device);
 
@@ -118,6 +124,7 @@ elanmoc2_cmd_usb_callback(FpiUsbTransfer *transfer,
   else
   {
     /* Receive callback */
+    const Elanmoc2Cmd *cmd = self->in_flight_cmd;
 
     if (transfer->actual_length > 0 &&
         transfer->buffer[0] != 0x40 &&
@@ -127,6 +134,33 @@ elanmoc2_cmd_usb_callback(FpiUsbTransfer *transfer,
       fp_warn("ELANMOC2: unexpected packet header 0x%02x, continuing",
               transfer->buffer[0]);
     }
+
+    /* Some cancellable (MOC) commands on this hardware revision first send
+     * a short 1-byte ack/arm packet before the real status packet arrives
+     * once the finger is actually captured. If we got fewer bytes than
+     * expected, re-arm another read instead of treating this as final. */
+    if (cmd != NULL && cmd->is_cancellable &&
+        transfer->actual_length < cmd->in_len &&
+        self->short_read_retries < 5)
+    {
+      self->short_read_retries++;
+      fp_info("ELANMOC2: short read (%d/%d bytes) on cancellable cmd, re-arming read (retry %u)",
+              transfer->actual_length, cmd->in_len, self->short_read_retries);
+
+      FpiUsbTransfer *transfer_in = fpi_usb_transfer_new(device);
+      transfer_in->short_is_error = FALSE;
+      fpi_usb_transfer_fill_bulk(transfer_in, cmd->ep_in,
+                                 MAX(cmd->in_len, 64));
+      fpi_usb_transfer_submit(transfer_in,
+                              ELANMOC2_USB_RECV_TIMEOUT,
+                              cmd->is_cancellable ? fpi_device_get_cancellable(device) : NULL,
+                              elanmoc2_cmd_usb_callback,
+                              NULL);
+      return;
+    }
+
+    self->in_flight_cmd = NULL;
+    self->awaiting_read = FALSE;
 
     g_assert_null(self->buffer_in);
 
