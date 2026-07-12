@@ -1,0 +1,67 @@
+(fprintd:317034): fprintd-DEBUG: 02:22:25.586: About to load configuration file '/etc/fprintd.conf'
+(fprintd:317034): fprintd-DEBUG: 02:22:25.586: Launching FprintObject
+(fprintd:317034): libfprint-context-DEBUG: 02:22:25.586: Initializing FpContext (libfprint version 1.94.9)
+(fprintd:317034): fprintd-DEBUG: 02:22:25.591: Preparing devices for resume
+(fprintd:317034): libfprint-context-DEBUG: 02:22:25.591: No driver found for USB device 1D6B:0003
+(fprintd:317034): libfprint-context-DEBUG: 02:22:25.591: No driver found for USB device 13D3:56FF
+(fprintd:317034): libfprint-context-DEBUG: 02:22:25.591: No driver found for USB device 17EF:608D
+(fprintd:317034): libfprint-context-DEBUG: 02:22:25.591: No driver found for USB device 057E:0000
+(fprintd:317034): libfprint-context-DEBUG: 02:22:25.591: No driver found for USB device 35D6:2510
+(fprintd:317034): libfprint-context-DEBUG: 02:22:25.591: No driver found for USB device 8087:0026
+(fprintd:317034): libfprint-context-DEBUG: 02:22:25.591: No driver found for USB device 1D6B:0002
+(fprintd:317034): libfprint-context-DEBUG: 02:22:25.591: No driver found for USB device 0BDA:8153
+(fprintd:317034): libfprint-context-DEBUG: 02:22:25.591: No driver found for USB device 35D6:3510
+(fprintd:317034): libfprint-context-DEBUG: 02:22:25.591: No driver found for USB device 1D6B:0003
+(fprintd:317034): libfprint-context-DEBUG: 02:22:25.591: No driver found for USB device 1D6B:0002
+(fprintd:317034): libfprint-device-DEBUG: 02:22:25.593: Device reported probe completion
+(fprintd:317034): fprintd-DEBUG: 02:22:25.593: Got delay inhibitor for sleep.
+(fprintd:317034): libfprint-device-DEBUG: 02:22:25.593: Completing action FPI_DEVICE_ACTION_PROBE in idle!
+(fprintd:317034): libfprint-device-DEBUG: 02:22:25.593: Updated temperature model after 0.00 seconds, ratio 0.27 -> 0.27, active 0 -> 0, FP_TEMPERATURE_COLD -> FP_TEMPERATURE_COLD
+(fprintd:317034): fprintd-DEBUG: 02:22:25.594: Device ElanTech Fingerprint Sensor scan type changed to 'swipe'
+(fprintd:317034): fprintd-DEBUG: 02:22:25.594: Device ElanTech Fingerprint Sensor enroll stages changed to 6
+(fprintd:317034): fprintd-DEBUG: 02:22:25.594: Finger present 0
+(fprintd:317034): fprintd-DEBUG: 02:22:25.594: Finger needed 0
+(fprintd:317034): fprintd-DEBUG: 02:22:25.594: entering main loop
+(fprintd:317034): fprintd-DEBUG: 02:22:25.595: D-Bus service launched with name: net.reactivated.Fprint
+(fprintd:317034): fprintd-DEBUG: 02:22:32.403: Requesting authorization from :1.350 to call method 'Claim' for device 'ElanTech Fingerprint Sensor'
+(fprintd:317034): fprintd-DEBUG: 02:22:32.404: Getting authorization to perform Polkit action net.reactivated.fprint.device.verify
+(fprintd:317034): fprintd-DEBUG: 02:22:32.406: Authorization granted to :1.350 to call method 'Claim' for device 'ElanTech Fingerprint Sensor'!
+(fprintd:317034): fprintd-DEBUG: 02:22:32.406: user 'sigaran' claiming the device: 0
+(fprintd:317034): libfprint-elan-DEBUG: 02:22:32.406: 16077515130: ../libfprint/drivers/elan.c:908
+(fprintd:317034): libfprint-image_device-DEBUG: 02:22:32.406: Image device open completed
+(fprintd:317034): libfprint-device-DEBUG: 02:22:32.406: Device reported open completion
+(fprintd:317034): libfprint-device-DEBUG: 02:22:32.406: Completing action FPI_DEVICE_ACTION_OPEN in idle!
+(fprintd:317034): libfprint-device-DEBUG: 02:22:32.406: Updated temperature model after 6.81 seconds, ratio 0.27 -> 0.27, active 0 -> 0, FP_TEMPERATURE_COLD -> FP_TEMPERATURE_COLD
+(fprintd:317034): fprintd-DEBUG: 02:22:32.406: claimed device 0
+(fprintd:317034): fprintd-DEBUG: 02:22:32.407: Requesting authorization from :1.350 to call method 'ListEnrolledFingers' for device 'ElanTech Fingerprint Sensor'
+(fprintd:317034): fprintd-DEBUG: 02:22:32.407: Getting authorization to perform Polkit action net.reactivated.fprint.device.verify
+(fprintd:317034): fprintd-DEBUG: 02:22:32.409: Authorization granted to :1.350 to call method 'ListEnrolledFingers' for device 'ElanTech Fingerprint Sensor'!
+(fprintd:317034): fprintd-DEBUG: 02:22:32.409: file_storage_discover_prints() for user 'sigaran' in '/var/lib/fprint/sigaran/elan/0'
+(fprintd:317034): fprintd-DEBUG: 02:22:32.409: scan_dev_storedir(): opendir("/var/lib/fprint/sigaran/elan/0") failed: Error opening directory “/var/lib/fprint/sigaran/elan/0”: No such file or directory
+(fprintd:317034): libfprint-elan-DEBUG: 02:22:32.410: 16077519009: ../libfprint/drivers/elan.c:939
+(fprintd:317034): libfprint-elan-DEBUG: 02:22:32.410: 16077519043: ../libfprint/drivers/elan.c:100
+(fprintd:317034): libfprint-image_device-DEBUG: 02:22:32.410: Image device close completed
+(fprintd:317034): libfprint-device-DEBUG: 02:22:32.410: Device reported close completion
+(fprintd:317034): libfprint-device-DEBUG: 02:22:32.410: Completing action FPI_DEVICE_ACTION_CLOSE in idle!
+(fprintd:317034): libfprint-device-DEBUG: 02:22:32.410: Updated temperature model after 0.00 seconds, ratio 0.27 -> 0.27, active 0 -> 0, FP_TEMPERATURE_COLD -> FP_TEMPERATURE_COLD
+(fprintd:317034): fprintd-DEBUG: 02:22:35.962: Requesting authorization from :1.351 to call method 'Claim' for device 'ElanTech Fingerprint Sensor'
+(fprintd:317034): fprintd-DEBUG: 02:22:35.962: Getting authorization to perform Polkit action net.reactivated.fprint.device.verify
+(fprintd:317034): fprintd-DEBUG: 02:22:35.964: Authorization granted to :1.351 to call method 'Claim' for device 'ElanTech Fingerprint Sensor'!
+(fprintd:317034): fprintd-DEBUG: 02:22:35.964: user 'sigaran' claiming the device: 0
+(fprintd:317034): libfprint-elan-DEBUG: 02:22:35.964: 16081073439: ../libfprint/drivers/elan.c:908
+(fprintd:317034): libfprint-image_device-DEBUG: 02:22:35.964: Image device open completed
+(fprintd:317034): libfprint-device-DEBUG: 02:22:35.964: Device reported open completion
+(fprintd:317034): libfprint-device-DEBUG: 02:22:35.964: Completing action FPI_DEVICE_ACTION_OPEN in idle!
+(fprintd:317034): libfprint-device-DEBUG: 02:22:35.965: Updated temperature model after 3.55 seconds, ratio 0.27 -> 0.26, active 0 -> 0, FP_TEMPERATURE_COLD -> FP_TEMPERATURE_COLD
+(fprintd:317034): fprintd-DEBUG: 02:22:35.965: claimed device 0
+(fprintd:317034): fprintd-DEBUG: 02:22:35.965: Requesting authorization from :1.351 to call method 'ListEnrolledFingers' for device 'ElanTech Fingerprint Sensor'
+(fprintd:317034): fprintd-DEBUG: 02:22:35.965: Getting authorization to perform Polkit action net.reactivated.fprint.device.verify
+(fprintd:317034): fprintd-DEBUG: 02:22:35.967: Authorization granted to :1.351 to call method 'ListEnrolledFingers' for device 'ElanTech Fingerprint Sensor'!
+(fprintd:317034): fprintd-DEBUG: 02:22:35.967: file_storage_discover_prints() for user 'sigaran' in '/var/lib/fprint/sigaran/elan/0'
+(fprintd:317034): fprintd-DEBUG: 02:22:35.967: scan_dev_storedir(): opendir("/var/lib/fprint/sigaran/elan/0") failed: Error opening directory “/var/lib/fprint/sigaran/elan/0”: No such file or directory
+(fprintd:317034): libfprint-elan-DEBUG: 02:22:35.968: 16081076875: ../libfprint/drivers/elan.c:939
+(fprintd:317034): libfprint-elan-DEBUG: 02:22:35.968: 16081076904: ../libfprint/drivers/elan.c:100
+(fprintd:317034): libfprint-image_device-DEBUG: 02:22:35.968: Image device close completed
+(fprintd:317034): libfprint-device-DEBUG: 02:22:35.968: Device reported close completion
+(fprintd:317034): libfprint-device-DEBUG: 02:22:35.968: Completing action FPI_DEVICE_ACTION_CLOSE in idle!
+(fprintd:317034): libfprint-device-DEBUG: 02:22:35.968: Updated temperature model after 0.00 seconds, ratio 0.26 -> 0.26, active 0 -> 0, FP_TEMPERATURE_COLD -> FP_TEMPERATURE_COLD

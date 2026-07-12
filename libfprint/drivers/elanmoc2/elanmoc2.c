@@ -157,7 +157,9 @@ elanmoc2_cmd_transceive_full(FpDevice *device,
   g_assert(buffer_out->len == cmd->out_len);
   if (self->in_flight_cmd != NULL)
   {
-    g_warning("ELANMOC2: command already running, skipping");
+    g_warning("ELANMOC2: command already running (in_flight cmd=%02x%02x), tried to send cmd=%02x%02x, skipping",
+              self->in_flight_cmd->cmd[0], self->in_flight_cmd->cmd[1],
+              cmd->cmd[0], cmd->cmd[1]);
     return;
   }
 
@@ -317,12 +319,26 @@ elanmoc2_open(FpDevice *device)
   g_autoptr(GError) error = NULL;
   FpiDeviceElanMoC2 *self;
 
-  if (!g_usb_device_reset(fpi_device_get_usb_device(device), &error))
-    return fpi_device_open_complete(device, g_steal_pointer(&error));
-
+  /* Try to claim the interface directly first. A previous session that
+   * closed cleanly leaves the device claimable without any reset needed.
+   * Forcing a reset unconditionally on every open is unreliable on some
+   * xHCI controllers: the device can fail to come back within the kernel's
+   * post-reset verification window, causing a full USB disconnect and
+   * re-enumeration mid-operation (see USB error -4 reports). */
   if (!g_usb_device_claim_interface(
           fpi_device_get_usb_device(FP_DEVICE(device)), 0, 0, &error))
-    return fpi_device_open_complete(device, g_steal_pointer(&error));
+    {
+      fp_warn("Claim interface failed (%s), attempting reset recovery",
+              error->message);
+      g_clear_error(&error);
+
+      if (!g_usb_device_reset(fpi_device_get_usb_device(device), &error))
+        return fpi_device_open_complete(device, g_steal_pointer(&error));
+
+      if (!g_usb_device_claim_interface(
+              fpi_device_get_usb_device(FP_DEVICE(device)), 0, 0, &error))
+        return fpi_device_open_complete(device, g_steal_pointer(&error));
+    }
 
   self = FPI_DEVICE_ELANMOC2(device);
   self->dev_type = fpi_device_get_driver_data(FP_DEVICE(device));
@@ -749,7 +765,24 @@ elanmoc2_enroll_run_state(FpiSsm *ssm, FpDevice *device)
 
     g_assert_nonnull(data_in);
     g_assert(data_in_len >= 2);
-    self->enrolled_num = data_in[1];
+
+    {
+      guint8 offset1_val = data_in[1];
+      guint8 offset2_val = data_in_len >= 3 ? data_in[2] : 255;
+
+      GString *hex = g_string_new(NULL);
+      for (gsize i = 0; i < data_in_len; i++)
+        g_string_append_printf(hex, "%02x ", data_in[i]);
+      fp_info("get_enrolled_count raw response (%zu bytes): %s -> data_in[1]=%d data_in[2]=%d (MAX=%d)",
+              data_in_len, hex->str, offset1_val, offset2_val, ELANMOC2_MAX_PRINTS);
+      g_string_free(hex, TRUE);
+
+      /* EXPERIMENTAL: using offset 2 instead of offset 1 for this specific
+       * command's response, since it uses a different reply format
+       * (in_len=64, header byte 0x98) than the 2-byte status responses used
+       * by other commands. */
+      self->enrolled_num = (data_in_len >= 3) ? data_in[2] : data_in[1];
+    }
 
     if (self->enrolled_num >= ELANMOC2_MAX_PRINTS)
     {
@@ -1111,7 +1144,9 @@ elanmoc2_clear_storage_run_state(FpiSsm *ssm, FpDevice *device)
       fpi_ssm_next_state(ssm);
       break;
     }
-    fpi_ssm_next_state(ssm);
+    elanmoc2_cmd_transceive(device, &cmd_wipe_sensor, buffer_out);
+    self->just_wiped = TRUE;
+    fp_info("Wipe sensor command sent (clear storage)");
     break;
 
   case CLEAR_STORAGE_GET_NUM_ENROLLED:
@@ -1143,6 +1178,15 @@ elanmoc2_clear_storage_run_state(FpiSsm *ssm, FpDevice *device)
 
     const guint8 *data_in = g_bytes_get_data(buffer_in, NULL);
     self->enrolled_num = data_in[1];
+
+    {
+      GString *hex = g_string_new(NULL);
+      for (gsize i = 0; i < buffer_in_len; i++)
+        g_string_append_printf(hex, "%02x ", data_in[i]);
+      fp_info("clear_storage get_enrolled_count raw response (%zu bytes): %s -> parsed enrolled_num=%d",
+              buffer_in_len, hex->str, self->enrolled_num);
+      g_string_free(hex, TRUE);
+    }
 
     if (self->enrolled_num == 0)
     {
